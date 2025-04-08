@@ -1,0 +1,31 @@
+---
+title: "stream_function"
+output: html_document
+---
+
+Tips for writing functions: 
+
+- Don't write in values within the function 
+
+
+This is an inline function. It is local to the markdown file that you made it on. If is best practice to write function in its own R file 
+
+```{r}
+streamflow = function( precip, ET, ds) {
+  
+  Q = precip - ET + ds 
+ 
+  if (Q < 0) {warning(print("Q is negative"))}
+  
+  return(Q)
+}
+```
+
+
+
+Here is how you source a function 
+```{r}
+library(here)
+source(here("sections", "week2", "streamflow.R"))
+```
+
