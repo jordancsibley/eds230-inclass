@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(deSolve)
 library(here)
-```e
+```
 
 # R implementation
 
@@ -51,3 +51,28 @@ filled.contour(res$qin, xlab = "Time", ylab = "Distance")
 
 # 1. Play with time step, space step and parameters
 # 2. Design different ways to summarize and visualize output 
+
+
+
+## Play with diffusion function and write new function that takes the input of the output of diffusion function 
+
+Function script: diffusion_output.R 
+
+Just trying it out first 
+```{r}
+diffusion_stat <- function(diffusion_result) {
+  mean <- mean(diffusion_result$conc)
+  return(mean)
+}
+
+diffusion_stat(result)
+```
+
+Sourcing and using 
+```{r}
+source(here('R', 'diffusion_output.R'))
+
+# Use function with diffusion resuls 
+diffusion_stat(res)
+```
+
