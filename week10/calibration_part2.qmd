@@ -1,0 +1,119 @@
+---
+title: "calibration_part2"
+author: "Jordan Sibley and Liz Peterson"
+format: pdf
+---
+## Set Up 
+```{r}
+library(tidyverse)
+library(here)
+
+source(here('R', 'compute_lowflowmetrics_all.R'))
+```
+ 
+ 
+## Data 
+```{r}
+# Load in data 
+msage = readRDS(here('week10', 'msage.RDS'))
+
+# Rearrange so we can plot all results
+#msagel = msage %>% gather(key="sim",value="str", -date, -month, -day, -year, -wy,-obs)
+```
+
+
+## Directions
+
+Using your performance metric that you developed in Calibration Part 1:
+
+Use the performance values as weights to come up with a max likelihood estimate (MLE) of a) daily streamflow and b) another component of streamflow that is relevant given your performance metric (e.g August streamflow in the class example)
+
+Graph MLE and observed for the streamflow component of interest
+
+Compute the correlations between observed and the MLE and observed flow for daily flow and your streamflow component of interest
+
+
+### Compute performance metrics 
+```{r}
+# Rearrange so we can plot all results (long format)
+msagel = msage %>%
+  gather(key = "sim", value = "str", -date, -month, -day, -year, -wy, -obs)
+
+# Compute performance metrics for each simulation
+res <- msage %>%
+  select(-date, -month, -day, -year, -wy, -obs) %>%
+  apply(2, compute_lowflowmetrics_all,
+        o = msage$obs,
+        month = msage$month,
+        year = msage$year,
+        day = msage$day,
+        wy = msage$wy)
+
+# Convert results to dataframe
+results <- as.data.frame(matrix(unlist(res), byrow = TRUE, ncol = 5))
+colnames(results) <- c("annual_min_err", "annual_min_cor", "low_month_err", "low_month_cor", "combined")
+results$sim <- colnames(msage %>% select(-date, -month, -day, -year, -wy, -obs))
+```
+
+
+### Calculate MLE for August flow based on performance values as weights
+```{r}
+# Select top-performing parameter sets
+topN <- 50
+results_acc <- results %>%
+  arrange(desc(combined)) %>%
+  slice(1:topN)
+
+# Normalize weights
+results_acc <- results_acc %>%
+  mutate(
+    weight = (combined - min(combined)) / (max(combined) - min(combined)),
+    weight = weight / sum(weight)
+  )
+
+# Join weights to long-form data
+msagel_acc <- msagel %>%
+  filter(sim %in% results_acc$sim) %>%
+  left_join(results_acc %>% select(sim, weight), by = "sim")
+
+# Calculate MLE of daily streamflow
+mle_daily <- msagel_acc %>%
+  group_by(date) %>%
+  summarize(
+    mle_flow = sum(str * weight, na.rm = TRUE),
+    obs_flow = first(obs),
+    .groups = "drop"
+  )
+
+# Add month and year
+mle_daily <- mle_daily %>%
+  mutate(month = month(date), year = year(date))
+
+# August flow MLE and observed
+aug_flow <- mle_daily %>%
+  filter(month == 8) %>%
+  group_by(year) %>%
+  summarize(
+    obs_aug = mean(obs_flow, na.rm = TRUE),
+    mle_aug = mean(mle_flow, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+
+### Plot results 
+```{r}
+# Plot MLE vs Observed August flow
+ggplot(aug_flow, aes(x = obs_aug, y = mle_aug)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray") +
+  labs(x = "Observed August Flow", y = "MLE August Flow", title = "MLE vs Observed: August Flow")
+
+# Correlations
+cat("Correlation: Observed vs MLE Daily Flow\n")
+print(cor(mle_daily$obs_flow, mle_daily$mle_flow, use = "complete.obs"))
+
+cat("Correlation: Observed vs MLE August Flow\n")
+print(cor(aug_flow$obs_aug, aug_flow$mle_aug, use = "complete.obs"))
+```
+
